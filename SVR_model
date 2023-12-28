@@ -1,0 +1,107 @@
+# Define the target features for training and testing
+X = gedi_sar_newgdf[['mean']]  # Use 'mean' column for both sentinel-1 bands
+y = gedi_sar_newgdf['rh_98']
+
+# Split data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Define the parameter grid based on only the training set
+param_grid = {
+    'C': [0.1, 1.0, 10.0],  # List of values for the C parameter to be tested
+    'epsilon': [0.1, 0.2, 0.3],  # List of values for the epsilon parameter to be tested
+    'loss': ['epsilon_insensitive', 'squared_epsilon_insensitive'],  # List of loss functions to be tested
+    'fit_intercept': [True, False],  # List of options for the fit_intercept parameter
+    'tol': [1e-4, 1e-5, 1e-6],  # List of tolerance values to be tested
+    'random_state': [42]  # Fixed random_state value for reproducible results
+}
+
+# Create LinearSVR model
+model = LinearSVR(dual=False)  # Set dual=False
+
+# Define the scoring metrics
+scoring = {
+    'r2': 'r2',
+    'RMSE': make_scorer(mean_squared_error, squared=False),
+    'Percent MSE': make_scorer(mean_squared_error, greater_is_better=False),
+    'Mean Bias': 'neg_mean_absolute_error'
+}
+
+# Create separate GridSearchCV objects for HH and HV bands
+grid_search_HH = GridSearchCV(model, param_grid, cv=10, scoring=scoring, refit='RMSE', verbose=True)
+grid_search_HV = GridSearchCV(model, param_grid, cv=10, scoring=scoring, refit='RMSE', verbose=True)
+
+# Fit the GridSearchCV objects to the training sets
+grid_search_HH.fit(X, y)
+#grid_search_HV.fit(X, y)
+
+# Print the best model, parameters, and the corresponding score for each scoring metric
+print("Best model:", grid_search.best_estimator_)
+print("Best parameters:", grid_search.best_params_)
+for metric in scoring:
+    print(f"Best {metric} score:", grid_search.best_score_[metric])
+
+#  export summary of grid serach performed
+df = pd.DataFrame(gridsearch.cv_results_)
+df = df.sort_values("rank_test_r2")
+df.to_cv("CV_reslts.csv")
+
+# Split data into training and test sets 70, 30
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Define SVR model
+model = LinearSVR(C = 10.0, 
+                  epsilon = 0.1, 
+                  fit_intercept = False, 
+                  loss = 'squared_epsilon_insensitive', 
+                  random_state = 42, 
+                  tol = 0.0001)
+
+# Train SVR model
+model.fit(X_train, y_train)
+
+# Make predictions on test set
+y_pred = model.predict(X_test)
+
+# Evaluate model performance
+# mse = mean_squared_error(y_test, y_pred)
+# print("Mean squared error: ", mse)
+print('MSE', mean_squared_error(y_test, y_pred))
+print('R2 Score', model.score(X_test, y_test))
+
+## plot the linearSVR model 
+
+# Plot predicted vs actual rh_98 for mean parameter
+plt.scatter(X_test['mean'], y_test, color='blue', label='Actual')
+plt.scatter(X_test['mean'], y_pred, color='red', label='Predicted')
+plt.xlabel('SAR mean parameter')
+plt.ylabel('Relative height (rh_98)')
+plt.legend()
+plt.show()
+
+ Plot predicted vs actual rh_98 for HH parameter
+plt.scatter(X_test['HH'], y_test, color='blue', label='Actual')
+plt.scatter(X_test['HH'], y_pred, color='red', label='Predicted')
+plt.xlabel('SAR HH parameter')
+plt.ylabel('Relative height (rh_98)')
+plt.legend()
+plt.show()
+
+# Plot predicted vs actual rh_98 for HV parameter
+plt.scatter(X_test['HV'], y_test, color='blue', label='Actual')
+plt.scatter(X_test['HV'], y_pred, color='red', label='Predicted')
+plt.xlabel('SAR HV parameter')
+plt.ylabel('Relative height (rh_98)')
+plt.legend()
+plt.show()
+
+# use this code to access the equation used to fit SVR model
+# x and y is already defined, and is the training data for the SVR
+svr = svm.SVR(kernel="rbf", C=C, gamma=gamma, epsilon=epsilon, tol=tol)
+svr.fit(x,y)
+vectors = []
+for i in svr.support_:
+    vectors.append([x[i][0], y[i]])
+out = svr._intercept_[0]
+for vect, coef in zip(vectors, svr._dual_coef_[0]):
+    out = out + coef * math.exp(-(vect[0] - x) ** 2 * gamma)
